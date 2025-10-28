@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Nganya Rides — The Matatu Experience</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:," />
+</head>
+<body>
+  <div id="ui-top">
+    <div>Role: <span id="role-name">Driver</span></div>
+    <div>KES <span id="money-amt">0</span></div>
+    <div>Rep: <span id="rep-amt">0</span></div>
+    <div style="margin-left:auto">Lang:
+      <select id="lang"><option value="en">EN</option><option value="sw">SW</option><option value="sheng">SHENG</option></select>
+    </div>
+  </div>
+
+  <div id="canvas-wrap"><canvas id="scene" tabindex="0"></canvas></div>
+
+  <div id="ui-bottom">
+    <button id="switch-role">Switch Role</button>
+    <button id="toggle-camera">Toggle Camera</button>
+    <button id="spawn-traffic">Spawn Traffic</button>
+    <div id="customize">
+      <label>Color: <input id="bus-color" type="color" value="#ff5500"></label>
+      <label>LED: <input id="leds" type="checkbox"></label>
+      <label>Decal:
+        <select id="decal"><option value="none">None</option><option value="skull">Skull</option><option value="flame">Flame</option></select>
+      </label>
+      <button id="apply-custom">Apply</button>
+    </div>
+  </div>
+
+  <div id="log"></div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
