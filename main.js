@@ -1,26 +1,22 @@
-/* main.js - GitHub Pages build (uses Three.js r170 from unpkg) */
+/* main.js - First Trip Prototype (Conductor 1st-person, Auto-drive) */
 import * as THREE from 'https://unpkg.com/three@0.170.0/build/three.module.js';
 import { OrbitControls } from 'https://unpkg.com/three@0.170.0/examples/jsm/controls/OrbitControls.js';
 
-const locales = {
-  en: { driver:'Driver', conductor:'Conductor', welcome:'Welcome to Nganya Rides!', switched:'Switched role', custom_applied:'Customization applied', police_stop:'Police checkpoint!', got_fined:'You were fined', bribed:'Bribe paid', collected:'Collected fares', bumped:'Bumped another vehicle!', camera_mode:'Camera', traffic_spawned:'Traffic spawned', lang_switched:'Language changed' },
-  sw: { driver:'Dereva', conductor:'Makanga', welcome:'Karibu Nganya Rides!', switched:'Umebadilisha jukumu', custom_applied:'Urembo umewekwa', police_stop:'Kizuizi cha polisi!', got_fined:'Umelipa faini', bribed:'Umelipa hongo', collected:'Pesa zimekusanywa', bumped:'Umegonga gari jingine!', camera_mode:'Kamera', traffic_spawned:'Magari zaidi', lang_switched:'Lugha imebadilishwa' },
-  sheng: { driver:'Driver', conductor:'Makanga', welcome:'Sasa tuko ndani ya Nganya Rides!', switched:"Swap'd role", custom_applied:'Swag updated', police_stop:'Police checkpoint, walem!', got_fined:'Fined!', bribed:'Bribe paid', collected:'Cash in hand', bumped:'You hit someone bruu!', camera_mode:'Cam', traffic_spawned:'Traffic incoming', lang_switched:'Lang switched' }
-};
+const locales = { en: { welcome: 'Welcome to Nganya Rides - First Trip' } };
 let lang = localStorage.getItem('nganya_lang') || 'en';
 
-const state = { role:'driver', money:0, rep:0, cameraMode:'third', busColor:0xff5500, leds:false, decal:'none', passengers:8 };
-
 // UI refs
-const roleName = document.getElementById('role-name');
-const moneyAmt = document.getElementById('money-amt');
-const repAmt = document.getElementById('rep-amt');
+const moneyEl = document.getElementById('money-amt');
+const repEl = document.getElementById('rep-amt');
 const logEl = document.getElementById('log');
-const langSelect = document.getElementById('lang'); langSelect.value = lang;
-function t(k){ return (locales[lang] && locales[lang][k]) || locales.en[k] || k; }
-function log(msg){ const d = document.createElement('div'); d.textContent = msg; logEl.prepend(d); }
+const stageEl = document.getElementById('trip-stage');
+const startBtn = document.getElementById('start-trip');
+const pauseBtn = document.getElementById('pause-trip');
+const summaryEl = document.getElementById('trip-summary');
 
-// Renderer + scene
+function log(message){ const d=document.createElement('div'); d.textContent=message; logEl.prepend(d); }
+
+// Scene setup
 const canvas = document.getElementById('scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
 renderer.setPixelRatio(window.devicePixelRatio);
@@ -28,85 +24,103 @@ function resize(){ renderer.setSize(window.innerWidth, window.innerHeight - 172)
 window.addEventListener('resize', resize);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x071018);
 scene.fog = new THREE.FogExp2(0x071018, 0.002);
-
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth/(window.innerHeight-172), 0.1, 1000);
-camera.position.set(0,6,14);
-
-// Controls
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; controls.dampingFactor = 0.07; controls.target.set(0,1,0);
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth/(window.innerHeight-172), 0.1, 2000);
+camera.position.set(0,1.6,0); // conductor eye height
 
 // Lighting
-scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-const dir = new THREE.DirectionalLight(0xffffff, 0.6); dir.position.set(10,20,10); scene.add(dir);
+const ambient = new THREE.AmbientLight(0xffffff, 0.6); scene.add(ambient);
+const dir = new THREE.DirectionalLight(0xfff0cc, 0.6); dir.position.set(5,10,2); scene.add(dir);
 
-// Ground + buildings
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(400,400), new THREE.MeshStandardMaterial({ color:0x0f1620 }));
+// Ground
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(800,800), new THREE.MeshStandardMaterial({ color:0x071217 }));
 ground.rotation.x = -Math.PI/2; scene.add(ground);
-function makeBuilding(x,z,h,c){ const g = new THREE.BoxGeometry(6,h,6); const m = new THREE.MeshStandardMaterial({color:c}); const mesh = new THREE.Mesh(g,m); mesh.position.set(x,h/2,z); scene.add(mesh); }
-makeBuilding(-20,-40,14,0x263344); makeBuilding(18,-60,18,0x334455); makeBuilding(40,-12,10,0x443322);
 
-// Textured colorful matatu (cube)
-const loader = new THREE.TextureLoader();
-const matTex = loader.load('assets/textures/matatu_texture.jpg');
-matTex.flipY = false;
-const busGroup = new THREE.Group();
-const busBody = new THREE.Mesh(new THREE.BoxGeometry(3.6,1.6,8), new THREE.MeshStandardMaterial({ map: matTex, metalness:0.2, roughness:0.5 }));
-busBody.position.y = 1; busGroup.add(busBody);
-// small details
-const windshield = new THREE.Mesh(new THREE.BoxGeometry(3.3,0.6,1.2), new THREE.MeshStandardMaterial({ color:0x08101a, transparent:true, opacity:0.6 }));
-windshield.position.set(0,1.25,-3.1); busGroup.add(windshield);
-const wheelGeo = new THREE.CylinderGeometry(0.45,0.45,0.6,16); const wheelMat = new THREE.MeshStandardMaterial({ color:0x111111 });
-[[-1.4,0.45,3],[1.4,0.45,3],[-1.4,0.45,-3],[1.4,0.45,-3]].forEach(p=>{ const w=new THREE.Mesh(wheelGeo,wheelMat); w.rotation.z = Math.PI/2; w.position.set(p[0],p[1],p[2]); busGroup.add(w); });
-scene.add(busGroup);
+// Bus interior builder (procedural)
+const bus = new THREE.Group();
+function buildInterior(){ 
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(3.8,0.1,8.2), new THREE.MeshStandardMaterial({ color:0x0b1220 }));
+  roof.position.y = 2.2; bus.add(roof);
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(3.8,0.1,8.2), new THREE.MeshStandardMaterial({ color:0x161b20 }));
+  floor.position.y = 0.0; bus.add(floor);
+  const seatMat = new THREE.MeshStandardMaterial({ color:0x223344 });
+  for(let i=0;i<4;i++){
+    const z = -2.4 + i*1.6;
+    const left = new THREE.Mesh(new THREE.BoxGeometry(0.8,0.6,1.4), seatMat); left.position.set(-0.9,0.6,z); bus.add(left);
+    const right = new THREE.Mesh(new THREE.BoxGeometry(0.8,0.6,1.4), seatMat); right.position.set(0.9,0.6,z); bus.add(right);
+  }
+  const windshield = new THREE.Mesh(new THREE.BoxGeometry(3.6,1.2,0.2), new THREE.MeshStandardMaterial({ color:0x08101a, transparent:true, opacity:0.6 }));
+  windshield.position.set(0,1.3,-3.6); bus.add(windshield);
+  const poleMat = new THREE.MeshStandardMaterial({ color:0xcccccc });
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,2.0,8), poleMat); pole.position.set(-0.1,1.0, -0.5); bus.add(pole);
+  bus.position.set(0,0,0);
+  scene.add(bus);
+}
+buildInterior();
 
-// rotate slowly on idle
-let idleRotation = 0.002;
+// camera look controls (conductor)
+let yaw = 0, pitch = 0;
+let isPointerDown = false, last = {x:0,y:0};
+canvas.addEventListener('pointerdown', (e)=>{ isPointerDown=true; canvas.setPointerCapture(e.pointerId); last.x=e.clientX; last.y=e.clientY; });
+window.addEventListener('pointerup', ()=>{ isPointerDown=false; });
+window.addEventListener('pointermove', (e)=>{ if(!isPointerDown) return; const dx = e.clientX - last.x; const dy = e.clientY - last.y; last.x=e.clientX; last.y=e.clientY; yaw -= dx*0.002; pitch = Math.max(-0.5, Math.min(0.5, pitch - dy*0.002)); });
+function updateCamera(){ const eyeLocal = new THREE.Vector3(0.9,1.2,2.8); const eyeWorld = eyeLocal.applyMatrix4(bus.matrixWorld); camera.position.lerp(eyeWorld, 0.25); const look = new THREE.Vector3(Math.sin(yaw), pitch, -1).applyMatrix4(bus.matrixWorld); camera.lookAt(look); }
 
-// decal + leds
-let decalSprite = null, ledMesh = null;
-function updateDecal(){ if(decalSprite) busGroup.remove(decalSprite); if(state.decal==='none') return; const cx=document.createElement('canvas'); cx.width=256; cx.height=128; const ctx=cx.getContext('2d'); ctx.fillStyle='rgba(255,255,255,0)'; ctx.fillRect(0,0,256,128); ctx.fillStyle='#fff'; ctx.font='48px sans-serif'; ctx.textAlign='center'; ctx.fillText(state.decal.toUpperCase(),128,78); const tex=new THREE.CanvasTexture(cx); const mat=new THREE.SpriteMaterial({ map:tex, transparent:true }); decalSprite=new THREE.Sprite(mat); decalSprite.scale.set(4,1.6,1); decalSprite.position.set(0,1.1,4.05); busGroup.add(decalSprite); }
-function updateLEDs(){ if(ledMesh) busGroup.remove(ledMesh); if(!state.leds) return; const geom=new THREE.BoxGeometry(3.6,0.06,0.2); const mat=new THREE.MeshBasicMaterial({ color:0x66ffcc, emissive:0x66ffcc }); ledMesh=new THREE.Mesh(geom,mat); ledMesh.position.set(0,0.45,4.2); busGroup.add(ledMesh); }
+// passengers procedural
+const passengers = [];
+function spawnPassengers(){
+  const colors = [0xffc857, 0xff6b6b, 0x6bd4ff, 0xa0ff9b];
+  const seats = [];
+  for(let i=0;i<4;i++){ const z = -2.4 + i*1.6; seats.push([-0.9,0.6,z]); seats.push([0.9,0.6,z]); }
+  const num = Math.floor(4 + Math.random()*4);
+  for(let i=0;i<num;i++){
+    const s = seats[i];
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.18,0.35,4,8), new THREE.MeshStandardMaterial({ color: colors[i%colors.length] }));
+    body.position.set(s[0], s[1], s[2]);
+    passengers.push({mesh: body, paid: false});
+    bus.add(body);
+  }
+}
+spawnPassengers();
 
-// traffic (looping)
-const traffic = new THREE.Group(); scene.add(traffic);
-const paths = [
-  (t)=>{ const a = t * Math.PI * 2; return new THREE.Vector3(Math.cos(a)*30,0,Math.sin(a)*30); },
-  (t)=>{ if(t<0.25) return new THREE.Vector3(-40 + 320*t,0,-40); if(t<0.5) return new THREE.Vector3(40,0,-40 + 320*(t-0.25)); if(t<0.75) return new THREE.Vector3(40 - 320*(t-0.5),0,40); return new THREE.Vector3(-40,0,40 - 320*(t-0.75)); }
-];
-function spawnTraffic(n=8){ for(let i=0;i<n;i++){ const car = new THREE.Mesh(new THREE.BoxGeometry(2,1,4), new THREE.MeshStandardMaterial({ color: Math.random()*0xffffff })); car.userData = { pathIdx: i % paths.length, t: Math.random() }; traffic.add(car); } log(t('traffic_spawned')); }
+// driver simple model
+const driver = new THREE.Mesh(new THREE.BoxGeometry(0.6,1.2,0.6), new THREE.MeshStandardMaterial({ color:0x445566 }));
+driver.position.set(-0.9,0.6,-3.8); bus.add(driver);
 
-// police event
-let policeTimer = 0;
-function triggerPolice(){ log(t('police_stop')); if(Math.random()<0.45){ const fine = 200 + Math.floor(Math.random()*800); state.money = Math.max(0, state.money - fine); state.rep = Math.max(0, state.rep - 1); log(t('got_fined') + ' KES ' + fine); } else { const bribe = 100 + Math.floor(Math.random()*400); state.money = Math.max(0, state.money - bribe); log(t('bribed') + ' KES ' + bribe); state.rep += 1; } updateUI(); }
+// route auto-drive
+const route = [ new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-40), new THREE.Vector3(30,0,-80), new THREE.Vector3(-20,0,-120) ];
+let routeIndex = 0; let routeT = 0; let autoDrive = false; let paused = false; let totalEarned = 0;
+function lerpVec(a,b,t){ return a.clone().lerp(b,t); }
+function updateAutoDrive(dt){
+  if(!autoDrive || paused) return;
+  const speed = 6;
+  const p0 = route[routeIndex]; const p1 = route[(routeIndex+1)%route.length];
+  routeT += dt * (speed / p0.distanceTo(p1));
+  if(routeT >= 1){ routeT = 0; routeIndex = (routeIndex+1) % route.length; onArrive(routeIndex); }
+  const pos = lerpVec(p0,p1,routeT);
+  bus.position.x = pos.x; bus.position.z = pos.z;
+  const dir = p1.clone().sub(p0).normalize(); const angle = Math.atan2(dir.x, -dir.z); bus.rotation.y = angle;
+  stageEl.textContent = 'Stage: ' + (['Ambassadeur','Kencom','Afya Centre','Railways'][routeIndex]||'-');
+}
 
-// controls
-const keys = {}; window.addEventListener('keydown', e=> keys[e.key.toLowerCase()] = true); window.addEventListener('keyup', e=> keys[e.key.toLowerCase()] = false);
-let speed = 0; let rotation = 0;
+function onArrive(idx){
+  paused = true;
+  let earned = 0;
+  passengers.forEach(p=>{ if(!p.paid){ const pay = 20 + Math.floor(Math.random()*40); earned += pay; p.paid = true; } });
+  totalEarned += earned; moneyEl.textContent = Math.round(totalEarned); repEl.textContent = Math.round((totalEarned/100));
+  log('Arrived at stop: ' + (['Ambassadeur','Kencom','Afya Centre','Railways'][idx]||'') + ' — Collected KES ' + earned);
+  setTimeout(()=>{ paused = false; if(idx === route.length-1){ autoDrive = false; showSummary(); } }, 1800);
+}
 
-function conductorCollect(){ if(state.role !== 'conductor') return; const fare = 50; const collected = fare * Math.max(0, Math.floor(state.passengers * (0.6 + Math.random()*0.6))); state.money += collected; state.rep += 0.2; log(t('collected') + ' KES ' + collected); updateUI(); }
+function showSummary(){ const overlay = document.getElementById('trip-summary'); overlay.innerHTML = '<div class="panel"><h2>Trip Complete</h2><p>Total earned: KES ' + totalEarned + '</p><p>Passengers: ' + passengers.length + '</p><button id="close-summary">Close</button></div>'; overlay.classList.remove('hidden'); document.getElementById('close-summary').addEventListener('click', ()=>{ overlay.classList.add('hidden'); totalEarned=0; moneyEl.textContent='0'; repEl.textContent='0'; }); }
 
-// UI wiring
-document.getElementById('switch-role').addEventListener('click', ()=>{ state.role = (state.role === 'driver') ? 'conductor' : 'driver'; roleName.textContent = t(state.role); log(t('switched') + ' → ' + t(state.role)); });
-document.getElementById('toggle-camera').addEventListener('click', ()=>{ state.cameraMode = (state.cameraMode === 'third') ? 'first' : 'third'; log(t('camera_mode') + ' ' + state.cameraMode); });
-document.getElementById('spawn-traffic').addEventListener('click', ()=> spawnTraffic(10));
-document.getElementById('apply-custom').addEventListener('click', ()=>{ const color = document.getElementById('bus-color').value; state.busColor = parseInt(color.replace('#','0x')); state.leds = document.getElementById('leds').checked; state.decal = document.getElementById('decal').value; busBody.material.color.setHex(state.busColor); updateLEDs(); updateDecal(); log(t('custom_applied')); });
-document.getElementById('lang').addEventListener('change', (e)=>{ lang = e.target.value; localStorage.setItem('nganya_lang', lang); roleName.textContent = t(state.role); log(t('lang_switched')); });
+// UI
+startBtn.addEventListener('click', ()=>{ if(!autoDrive){ autoDrive=true; routeIndex=0; routeT=0; totalEarned=0; } });
+pauseBtn.addEventListener('click', ()=>{ paused = !paused; });
 
-function t(k){ return (locales[lang] && locales[lang][k]) || locales.en[k] || k; }
-function log(msg){ const d = document.createElement('div'); d.textContent = msg; logEl.prepend(d); }
-function updateUI(){ moneyAmt.textContent = Math.round(state.money); repAmt.textContent = Math.round(state.rep); }
+log(locales[lang].welcome);
 
-// animate
+// animate loop
 const clock = new THREE.Clock();
-function animate(){ const dt = clock.getDelta();
-  if(state.role === 'driver' && speed === 0){ busGroup.rotation.y += idleRotation; }
-  traffic.children.forEach(c=>{ c.userData.t += dt * 0.03; if(c.userData.t > 1) c.userData.t -= 1; const pos = paths[c.userData.pathIdx](c.userData.t); c.position.copy(pos); const next = paths[c.userData.pathIdx]((c.userData.t + 0.01)%1); c.lookAt(next); });
-  policeTimer += dt; if(policeTimer > 12 + Math.random()*30){ policeTimer = 0; triggerPolice(); }
-  if(state.role === 'driver'){ if(keys['w']||keys['arrowup']) speed += dt * 6; if(keys['s']||keys['arrowdown']) speed -= dt * 6; speed = Math.max(0, Math.min(25, speed)); rotation = 0; if(keys['a']||keys['arrowleft']) rotation = 0.04; if(keys['d']||keys['arrowright']) rotation = -0.04; busGroup.rotation.y += rotation * speed * 0.02; busGroup.position.x += Math.sin(busGroup.rotation.y) * speed * dt; busGroup.position.z += Math.cos(busGroup.rotation.y) * speed * dt * -1; traffic.children.forEach(c=>{ const dist = c.position.distanceTo(busGroup.position); if(dist < 3.5){ log(t('bumped')); state.rep = Math.max(0, state.rep - 1); speed *= 0.6; } }); } else { if(keys['c']){ conductorCollect(); keys['c'] = false; } }
-  const target = new THREE.Vector3(busGroup.position.x, busGroup.position.y + 1.2, busGroup.position.z);
-  const camPos = new THREE.Vector3(target.x + 12*Math.sin(busGroup.rotation.y), target.y + 6, target.z + 12*Math.cos(busGroup.rotation.y));
-  camera.position.lerp(camPos, 0.12); camera.lookAt(target); renderer.render(scene, camera); requestAnimationFrame(animate); }
-updateUI(); roleName.textContent = t(state.role); setTimeout(function(){ var s=document.getElementById('splash'); if(s) s.style.display='none'; }, 1600); animate();
+function animate(){ const dt = clock.getDelta(); updateAutoDrive(dt); passengers.forEach((p,i)=>{ p.mesh.rotation.y = Math.sin(performance.now()*0.001 + i)*0.05; }); updateCamera(); renderer.render(scene,camera); requestAnimationFrame(animate); }
+resize(); setTimeout(()=>{ const s = document.getElementById('splash'); if(s) s.style.display='none'; }, 1400); animate();
