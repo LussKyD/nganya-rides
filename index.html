@@ -2,19 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Nganya Rides — First Trip Prototype</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Nganya Rides v0.4 — First Trip (CDN)</title>
 <link rel="stylesheet" href="style.css" />
 <link rel="icon" href="data:," />
 </head>
 <body>
-  <div id="splash" class="splash"><div class="splash-inner"><div class="made">Made in Nairobi</div></div></div>
+  <div id="splash" class="splash"><img src="assets/textures/splash_skyline.png" alt="Made in Nairobi" /><div class="splash-text">Made in Nairobi</div></div>
   <img id="watermark" src="assets/logos/draco_watermark.png" alt="DRACO iNC Techs" />
   <div id="ui-top"><div>Role: <strong id="role-name">Conductor (1st-person)</strong></div><div>KES <strong id="money-amt">0</strong></div><div>Rep <strong id="rep-amt">0</strong></div></div>
   <div id="canvas-wrap"><canvas id="scene" tabindex="0"></canvas></div>
   <div id="ui-bottom"><button id="start-trip">Start Trip</button><button id="pause-trip">Pause</button><div id="trip-stage">Stage: -</div></div>
   <div id="trip-summary" class="overlay hidden"></div>
   <div id="log"></div>
+
+  <!-- Load Three.js from CDN (module) -->
   <script type="module" src="main.js"></script>
 </body>
 </html>

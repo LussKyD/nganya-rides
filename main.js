@@ -1,9 +1,6 @@
-/* main.js - First Trip Prototype (Conductor 1st-person, Auto-drive) */
+/* main.js v0.4 - CDN Three.js, First Trip Prototype */
 import * as THREE from 'https://unpkg.com/three@0.170.0/build/three.module.js';
 import { OrbitControls } from 'https://unpkg.com/three@0.170.0/examples/jsm/controls/OrbitControls.js';
-
-const locales = { en: { welcome: 'Welcome to Nganya Rides - First Trip' } };
-let lang = localStorage.getItem('nganya_lang') || 'en';
 
 // UI refs
 const moneyEl = document.getElementById('money-amt');
@@ -13,10 +10,11 @@ const stageEl = document.getElementById('trip-stage');
 const startBtn = document.getElementById('start-trip');
 const pauseBtn = document.getElementById('pause-trip');
 const summaryEl = document.getElementById('trip-summary');
+const splash = document.getElementById('splash');
 
-function log(message){ const d=document.createElement('div'); d.textContent=message; logEl.prepend(d); }
+function log(msg){ const d=document.createElement('div'); d.textContent=msg; logEl.prepend(d); }
 
-// Scene setup
+// Renderer + scene
 const canvas = document.getElementById('scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
 renderer.setPixelRatio(window.devicePixelRatio);
@@ -26,17 +24,17 @@ window.addEventListener('resize', resize);
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x071018, 0.002);
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth/(window.innerHeight-172), 0.1, 2000);
-camera.position.set(0,1.6,0); // conductor eye height
+camera.position.set(0,1.6,0);
 
-// Lighting
-const ambient = new THREE.AmbientLight(0xffffff, 0.6); scene.add(ambient);
+// lighting + night glow
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 const dir = new THREE.DirectionalLight(0xfff0cc, 0.6); dir.position.set(5,10,2); scene.add(dir);
 
-// Ground
+// ground
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(800,800), new THREE.MeshStandardMaterial({ color:0x071217 }));
 ground.rotation.x = -Math.PI/2; scene.add(ground);
 
-// Bus interior builder (procedural)
+// bus interior procedural
 const bus = new THREE.Group();
 function buildInterior(){ 
   const roof = new THREE.Mesh(new THREE.BoxGeometry(3.8,0.1,8.2), new THREE.MeshStandardMaterial({ color:0x0b1220 }));
@@ -58,15 +56,7 @@ function buildInterior(){
 }
 buildInterior();
 
-// camera look controls (conductor)
-let yaw = 0, pitch = 0;
-let isPointerDown = false, last = {x:0,y:0};
-canvas.addEventListener('pointerdown', (e)=>{ isPointerDown=true; canvas.setPointerCapture(e.pointerId); last.x=e.clientX; last.y=e.clientY; });
-window.addEventListener('pointerup', ()=>{ isPointerDown=false; });
-window.addEventListener('pointermove', (e)=>{ if(!isPointerDown) return; const dx = e.clientX - last.x; const dy = e.clientY - last.y; last.x=e.clientX; last.y=e.clientY; yaw -= dx*0.002; pitch = Math.max(-0.5, Math.min(0.5, pitch - dy*0.002)); });
-function updateCamera(){ const eyeLocal = new THREE.Vector3(0.9,1.2,2.8); const eyeWorld = eyeLocal.applyMatrix4(bus.matrixWorld); camera.position.lerp(eyeWorld, 0.25); const look = new THREE.Vector3(Math.sin(yaw), pitch, -1).applyMatrix4(bus.matrixWorld); camera.lookAt(look); }
-
-// passengers procedural
+// passengers
 const passengers = [];
 function spawnPassengers(){
   const colors = [0xffc857, 0xff6b6b, 0x6bd4ff, 0xa0ff9b];
@@ -90,6 +80,7 @@ driver.position.set(-0.9,0.6,-3.8); bus.add(driver);
 // route auto-drive
 const route = [ new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-40), new THREE.Vector3(30,0,-80), new THREE.Vector3(-20,0,-120) ];
 let routeIndex = 0; let routeT = 0; let autoDrive = false; let paused = false; let totalEarned = 0;
+
 function lerpVec(a,b,t){ return a.clone().lerp(b,t); }
 function updateAutoDrive(dt){
   if(!autoDrive || paused) return;
@@ -114,13 +105,26 @@ function onArrive(idx){
 
 function showSummary(){ const overlay = document.getElementById('trip-summary'); overlay.innerHTML = '<div class="panel"><h2>Trip Complete</h2><p>Total earned: KES ' + totalEarned + '</p><p>Passengers: ' + passengers.length + '</p><button id="close-summary">Close</button></div>'; overlay.classList.remove('hidden'); document.getElementById('close-summary').addEventListener('click', ()=>{ overlay.classList.add('hidden'); totalEarned=0; moneyEl.textContent='0'; repEl.textContent='0'; }); }
 
-// UI
+// camera look controls (conductor) - small rotation only
+let yaw = 0, pitch = 0;
+let isPointerDown = false, last = {x:0,y:0};
+canvas.addEventListener('pointerdown', (e)=>{ isPointerDown=true; canvas.setPointerCapture(e.pointerId); last.x=e.clientX; last.y=e.clientY; });
+window.addEventListener('pointerup', ()=>{ isPointerDown=false; });
+window.addEventListener('pointermove', (e)=>{ if(!isPointerDown) return; const dx = e.clientX - last.x; const dy = e.clientY - last.y; last.x=e.clientX; last.y=e.clientY; yaw -= dx*0.002; pitch = Math.max(-0.4, Math.min(0.4, pitch - dy*0.002)); });
+
+function updateCamera(){ const eyeLocal = new THREE.Vector3(0.9,1.2,2.8); const eyeWorld = eyeLocal.applyMatrix4(bus.matrixWorld); camera.position.lerp(eyeWorld, 0.25); const look = new THREE.Vector3( Math.sin(yaw), pitch, -1 ).applyMatrix4( bus.matrixWorld ); camera.lookAt(look); }
+
+// UI wiring
 startBtn.addEventListener('click', ()=>{ if(!autoDrive){ autoDrive=true; routeIndex=0; routeT=0; totalEarned=0; } });
 pauseBtn.addEventListener('click', ()=>{ paused = !paused; });
 
-log(locales[lang].welcome);
+// fade splash then initialize
+setTimeout(()=>{ if(splash){ splash.style.opacity='0'; setTimeout(()=>{ if(splash) splash.style.display='none'; }, 1000); } }, 2000);
+
+// small log message
+log('Nganya Rides v0.4 — First Trip Prototype');
 
 // animate loop
 const clock = new THREE.Clock();
 function animate(){ const dt = clock.getDelta(); updateAutoDrive(dt); passengers.forEach((p,i)=>{ p.mesh.rotation.y = Math.sin(performance.now()*0.001 + i)*0.05; }); updateCamera(); renderer.render(scene,camera); requestAnimationFrame(animate); }
-resize(); setTimeout(()=>{ const s = document.getElementById('splash'); if(s) s.style.display='none'; }, 1400); animate();
+resize(); animate();
