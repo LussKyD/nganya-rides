@@ -1,2 +1,1 @@
-console.log("Traffic module active — AI vehicles placeholder");
-export function spawnTraffic(){/* future implementation */}
+console.log('traffic module (stub)'); export function spawnTraffic(){}

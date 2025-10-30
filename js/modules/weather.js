@@ -1,2 +1,1 @@
-console.log("Weather module active — sunset/dusk cycle placeholder");
-export function updateWeather(){/* future sky and fog logic */}
+console.log('weather module (stub)'); export function updateWeather(){}

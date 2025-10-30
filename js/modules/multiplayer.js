@@ -1,2 +1,1 @@
-console.log("Multiplayer stub — future sync system");
-export function initMultiplayer(){/* future network hooks */}
+console.log('multiplayer module (stub)'); export function initMultiplayer(){}

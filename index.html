@@ -1,32 +1,40 @@
-<!DOCTYPE html>
-
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Nganya Rides v0.6.0 — Dynamic Sunset Edition</title>
-  <link rel="stylesheet" href="style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.min.js"></script>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Nganya Rides v0.5 Stable Responsive</title>
+<link rel="stylesheet" href="style.css" />
+<script src="https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.min.js"></script>
 </head>
 <body>
-  <div id="splash" class="splash"><h1>Made in Nairobi</h1></div>
-
-  <div class="hud">
-    <div class="info">💰 KES <span id="money-amt">0</span> | ⭐ Rep <span id="rep-amt">0</span></div>
-    <div class="buttons">
-      <button id="start-trip">Start Route</button>
-      <button id="pause-trip">Pause</button>
-    </div>
-    <div id="trip-stage">Stage: —</div>
+  <div id="splash" class="splash">
+    <img id="splash-bg" src="assets/textures/skyline_backup.jpg" alt="Made in Nairobi"/>
+    <div class="splash-text">Made in Nairobi</div>
+    <div class="version">v0.5 Stable</div>
   </div>
 
-<canvas id="scene"></canvas>
+  <div id="ui-top" class="ui-top">
+    <div>Role: <strong id="role-name">Driver</strong></div>
+    <div>KES <strong id="money-amt">0</strong></div>
+    <div>Rep <strong id="rep-amt">0</strong></div>
+    <div style="margin-left:auto"><button id="toggle-camera">Switch: Chase</button></div>
+  </div>
 
-  <footer>
-    <img src="assets/logos/draco_watermark.png" alt="DRACO iNC Techs" class="watermark" />
-  </footer>
+  <div id="canvas-wrap"><canvas id="scene" tabindex="0"></canvas></div>
 
-  <div id="trip-summary" class="hidden"></div>
-  <script type="module" src="main.js"></script>
+  <div id="ui-bottom" class="ui-bottom">
+    <button id="start-trip">Start Route</button>
+    <button id="pause-trip">Pause</button>
+    <div id="stage">Stage: <span id="stage-name">-</span></div>
+    <div style="flex:1"></div>
+    <div id="watermark-text">DRACO iNC Techs © 2025</div>
+  </div>
+
+  <div id="tips" class="tips"></div>
+  <div id="log" class="log"></div>
+  <div id="trip-summary" class="overlay hidden"></div>
+
+<script type="module" src="main.js"></script>
 </body>
 </html>
