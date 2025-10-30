@@ -1,33 +1,32 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Nganya Rides v0.6 — Driveable Matatu Edition</title>
-<link rel="stylesheet" href="style.css" />
-<link rel="icon" href="data:," />
-<script src="https://unpkg.com/three@0.159.0/build/three.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nganya Rides v0.6.0 — Dynamic Sunset Edition</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.min.js"></script>
 </head>
 <body>
-  <div id="splash" class="splash"><img src="assets/textures/splash_skyline.png" alt="Made in Nairobi" /><div class="splash-text">Made in Nairobi</div></div>
-  <img id="watermark" src="assets/logos/draco_watermark.png" alt="DRACO iNC Techs" />
-  <div id="ui-top">
-    <div id="role-block">Role: <strong id="role-name">Driver</strong></div>
-    <div id="money">KES <strong id="money-amt">0</strong></div>
-    <div id="rep">Rep <strong id="rep-amt">0</strong></div>
-    <div style="margin-left:auto">
-      <button id="toggle-camera">Switch: Cockpit</button>
+  <div id="splash" class="splash"><h1>Made in Nairobi</h1></div>
+
+  <div class="hud">
+    <div class="info">💰 KES <span id="money-amt">0</span> | ⭐ Rep <span id="rep-amt">0</span></div>
+    <div class="buttons">
+      <button id="start-trip">Start Route</button>
+      <button id="pause-trip">Pause</button>
     </div>
+    <div id="trip-stage">Stage: —</div>
   </div>
-  <div id="canvas-wrap"><canvas id="scene" tabindex="0"></canvas></div>
-  <div id="ui-bottom">
-    <button id="start-trip">Start Route</button>
-    <button id="pause-trip">Pause</button>
-    <div id="stage">Stage: <span id="stage-name">-</span></div>
-    <div style="flex:1"></div>
-    <div id="watermark-text">DRACO iNC Techs © 2025</div>
-  </div>
-  <div id="log"></div>
-  <script src="main.js"></script>
+
+<canvas id="scene"></canvas>
+
+  <footer>
+    <img src="assets/logos/draco_watermark.png" alt="DRACO iNC Techs" class="watermark" />
+  </footer>
+
+  <div id="trip-summary" class="hidden"></div>
+  <script type="module" src="main.js"></script>
 </body>
 </html>
