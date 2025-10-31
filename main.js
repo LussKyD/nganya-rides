@@ -1,129 +1,195 @@
-/* main.js v0.5 Stable Responsive
-   - Realistic constrained driving (no drift)
-   - Chase <-> Cockpit camera toggle
-   - Dynamic lighting mode (day / sunset) switch for testing
-   - Conductor auto-collection and working route system
-*/
+/* main.js v0.7 - Stage Loop, roadside props, HUD fixes */
 
-import('./js/modules/traffic.js').catch(()=>{});
-import('./js/modules/weather.js').catch(()=>{});
-import('./js/modules/multiplayer.js').catch(()=>{});
+import('./js/modules/routes.js').catch(()=>{});
+import('./js/modules/interactions.js').catch(()=>{});
 
-const $ = s => document.querySelector(s);
-const moneyEl = $('#money-amt'), repEl = $('#rep-amt'), stageEl = $('#stage-name');
-const startBtn = $('#start-trip'), pauseBtn = $('#pause-trip'), toggleCamBtn = $('#toggle-camera');
-const splash = $('#splash'), tipsEl = $('#tips'), logEl = $('#log');
+let scene, renderer, chaseCam, cockpitCam, activeCam;
+let bus;
+let money = 0, rep = 0;
+let running = false;
+let lastTime = performance.now();
+let routeStages = [];
+let currentStageIdx = 0;
+let returning = false;
+let routeSpeed = 12;
 
-function log(msg){ const d=document.createElement('div'); d.textContent=msg; logEl.prepend(d); }
+function $id(id){ return document.getElementById(id); }
 
-// renderer and scene
-const canvas = document.getElementById('scene');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
-renderer.setPixelRatio(window.devicePixelRatio); renderer.shadowMap.enabled=true;
-const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x071018, 0.0015);
+function createScene() {
+  renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  ( $id('game-container') || document.body ).appendChild(renderer.domElement);
 
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth/(window.innerHeight-172), 0.1, 2000);
-camera.position.set(0,2.4,6);
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0b1b2b);
 
-// lights (will support day <-> sunset)
-const hemi = new THREE.HemisphereLight(0xffffff, 0x080a10, 0.7); scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xffffff, 0.8); sun.position.set(40,60,20); sun.castShadow=true; scene.add(sun);
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.9);
+  scene.add(hemi);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+  dir.position.set(40,100,50);
+  dir.castShadow = true;
+  scene.add(dir);
 
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(4000,4000), new THREE.MeshStandardMaterial({ color:0x0c1216 }));
-ground.rotation.x = -Math.PI/2; ground.receiveShadow=true; scene.add(ground);
-const road = new THREE.Mesh(new THREE.BoxGeometry(12,0.2,2000), new THREE.MeshStandardMaterial({ color:0x101820 }));
-road.position.set(0,0.1,-900); scene.add(road);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(2000,2000), new THREE.MeshStandardMaterial({color:0x1a1a1a}));
+  ground.rotation.x = -Math.PI/2;
+  ground.receiveShadow = true;
+  scene.add(ground);
 
-// horizon plane for skyline
-const horizonGeo = new THREE.PlaneGeometry(5000,800);
-const horizonMat = new THREE.MeshBasicMaterial({ color:0x000000 });
-const horizon = new THREE.Mesh(horizonGeo, horizonMat);
-horizon.position.set(0,150,-1400); horizon.rotation.x = -0.1; scene.add(horizon);
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(400,2000), new THREE.MeshStandardMaterial({color:0x222222}));
+  road.rotation.x = -Math.PI/2;
+  road.position.y = 0.01;
+  scene.add(road);
 
-// try CDN skyline then fallback
-const unsplash = 'https://images.unsplash.com/photo-1543702716-41d4b3f3a6b8?auto=format&fit=crop&w=1600&q=80';
-const img = new Image(); img.crossOrigin='anonymous';
-img.onload = ()=>{ const tex=new THREE.Texture(img); tex.needsUpdate=true; horizon.material.map=tex; horizon.material.needsUpdate=true; document.getElementById('splash-bg').src = unsplash; };
-img.onerror = ()=>{ console.warn('CDN skyline failed; using local backup'); };
-img.src = unsplash;
+  const busGeo = new THREE.BoxGeometry(4,2,10);
+  const busMat = new THREE.MeshStandardMaterial({color:0xcc4400});
+  bus = new THREE.Mesh(busGeo, busMat);
+  bus.castShadow = true;
+  bus.position.set(0,1,100);
+  scene.add(bus);
 
-// build bus (stable interior)
-const bus = new THREE.Group(); bus.position.set(0,0,0); scene.add(bus);
-(function buildBus(){
-  const body = new THREE.Mesh(new THREE.BoxGeometry(4.2,1.8,11.0), new THREE.MeshStandardMaterial({ color:0xff5a20, metalness:0.1, roughness:0.6 }));
-  body.position.set(0,1,0); body.castShadow=true; bus.add(body);
-  const seatMat = new THREE.MeshStandardMaterial({ color:0x203040 });
-  for(let r=0;r<4;r++){ const z=-2.8 + r*1.8; const l=new THREE.Mesh(new THREE.BoxGeometry(0.8,0.55,1.2), seatMat); l.position.set(-0.95,0.6,z); bus.add(l); const rgt = l.clone(); rgt.position.x = 0.95; bus.add(rgt); }
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,2.0,8), new THREE.MeshStandardMaterial({ color:0xcccccc }));
-  pole.position.set(-0.1,1.0,-0.5); bus.add(pole);
-})();
+  chaseCam = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 2000);
+  chaseCam.position.set(0,6,bus.position.z + 18);
+  chaseCam.lookAt(bus.position);
+  cockpitCam = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
+  cockpitCam.position.set(0,2,5);
+  bus.add(cockpitCam);
+  activeCam = chaseCam;
 
-// passengers
-const passengers = []; (function spawn(){ const colors=[0xffc857,0xff6b6b,0x6bd4ff,0xa0ff9b]; const seats=[]; for(let i=0;i<4;i++){ const z=-2.4+i*1.6; seats.push([-0.9,0.6,z]); seats.push([0.9,0.6,z]); } for(let i=0;i<6;i++){ const s=seats[i]; const p = new THREE.Mesh(new THREE.CapsuleGeometry(0.18,0.35,4,8), new THREE.MeshStandardMaterial({ color:colors[i%colors.length] })); p.position.set(s[0],s[1],s[2]); passengers.push({mesh:p,paid:false}); bus.add(p);} })();
+  if (window.RouteStages && Array.isArray(window.RouteStages) && window.RouteStages.length>0) {
+    routeStages = window.RouteStages.map((s)=> {
+      if (s.position && s.position.isVector3) return s.position.clone();
+      if (s.x !== undefined) return new THREE.Vector3(s.x, s.y||0, s.z);
+      if (s.position && typeof s.position.x === 'number') return new THREE.Vector3(s.position.x, s.position.y||0, s.position.z);
+      return new THREE.Vector3(0,0,0);
+    });
+  } else {
+    routeStages = [
+      new THREE.Vector3(0,0,80),
+      new THREE.Vector3(0,0,40),
+      new THREE.Vector3(0,0,0),
+      new THREE.Vector3(0,0,-40),
+      new THREE.Vector3(0,0,-80)
+    ];
+  }
 
-// driving state (no drift)
-const state = { speed:0, steering:0, maxSpeed:14, accel:6.5, brake:12, drag:3.2 };
-let keys={}; window.addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true); window.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+  routeStages.forEach((p, i)=>{
+    const marker = new THREE.Mesh(new THREE.ConeGeometry(1,2,8), new THREE.MeshStandardMaterial({color:0xffaa00}));
+    marker.position.set(p.x, 1, p.z);
+    marker.rotation.x = Math.PI;
+    scene.add(marker);
+  });
 
-function updateDriving(dt){
-  const forward = keys['w']||keys['arrowup']; const back = keys['s']||keys['arrowdown'];
-  if(forward) state.speed += state.accel*dt; else if(back) state.speed -= state.brake*dt; else state.speed -= Math.sign(state.speed)*Math.min(Math.abs(state.speed), state.drag*dt*10);
-  state.speed = Math.max(-6, Math.min(state.maxSpeed, state.speed));
-  const steerInput = (keys['a']||keys['arrowleft']?1:0) - (keys['d']||keys['arrowright']?1:0);
-  state.steering += (steerInput - state.steering) * Math.min(1, dt*6);
-  const turnRate = 1.1 * (Math.abs(state.speed)/Math.max(1,state.maxSpeed));
-  bus.rotation.y += state.steering * turnRate * dt;
-  const dir = new THREE.Vector3(Math.sin(bus.rotation.y),0,-Math.cos(bus.rotation.y));
-  bus.position.addScaledVector(dir, state.speed*dt);
-  bus.position.x = Math.max(-5.5, Math.min(5.5, bus.position.x));
+  addRoadsideProps();
+
+  window.addEventListener('resize', onResize);
 }
 
-// route & conductor
-const routePoints = [ new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-160), new THREE.Vector3(0,0,-360), new THREE.Vector3(0,0,-640) ];
-const routeNames = ['Ambassadeur','Kencom','Afya Centre','Railways'];
-let currentCheckpoint=0, routeActive=false, paused=false, money=0, rep=0;
-
-function conductorCollect(){ let collected=0; passengers.forEach(p=>{ if(!p.paid){ const fare = 30 + Math.floor(Math.random()*30); collected += fare; p.paid = true; } }); if(collected){ money += collected; rep += Math.floor(collected/100); moneyEl.textContent=Math.round(money); repEl.textContent=Math.round(rep); log('Conductor collected KES ' + collected); } }
-
-function checkStops(){ if(!routeActive||paused) return; const cp = routePoints[currentCheckpoint]; const dist = new THREE.Vector3(bus.position.x,0,bus.position.z).distanceTo(new THREE.Vector3(cp.x,0,cp.z)); if(dist < 8 && Math.abs(state.speed) < 1.0){ paused = true; log('Arrived at stop: '+routeNames[currentCheckpoint]); stageEl.textContent = routeNames[currentCheckpoint]; conductorCollect(); setTimeout(()=>{ paused=false; currentCheckpoint = Math.min(routePoints.length-1,currentCheckpoint+1); if(currentCheckpoint >= routePoints.length){ routeActive=false; log('Route finished'); } }, 1500); } }
-
-// camera toggle
-let cameraMode='chase'; function setCamera(mode){ cameraMode = mode; toggleCamBtn.textContent = (cameraMode==='chase'?'Switch: Cockpit':'Switch: Chase'); } setCamera('chase'); toggleCamBtn.addEventListener('click', ()=> setCamera(cameraMode==='chase'?'cockpit':'chase'));
-
-function updateCamera(dt){
-  if(cameraMode==='chase'){
-    const chaseOffset = new THREE.Vector3(0,3,8).applyAxisAngle(new THREE.Vector3(0,1,0), bus.rotation.y).add(bus.position);
-    camera.position.lerp(chaseOffset, 0.12);
-    camera.lookAt(bus.position.clone().add(new THREE.Vector3(0,1.2,0)));
-  } else {
-    const eyeLocal = new THREE.Vector3(-0.8,1.35,-3.9); const eyeWorld = eyeLocal.clone().applyMatrix4(bus.matrixWorld); camera.position.lerp(eyeWorld, 0.25); const lookLocal = new THREE.Vector3(-0.2,1.25,-1.6); const lookWorld = lookLocal.clone().applyMatrix4(bus.matrixWorld); camera.lookAt(lookWorld);
+function addRoadsideProps(){
+  const poleGeo = new THREE.CylinderGeometry(0.08,0.08,8,6);
+  const poleMat = new THREE.MeshStandardMaterial({color:0x999999});
+  const treeGeo = new THREE.ConeGeometry(1.2,4,8);
+  const treeMat = new THREE.MeshStandardMaterial({color:0x116611});
+  for (let z = -200; z <= 200; z += 15){
+    const p1 = new THREE.Mesh(poleGeo, poleMat);
+    p1.position.set(-7,4,z);
+    scene.add(p1);
+    const p2 = new THREE.Mesh(poleGeo, poleMat);
+    p2.position.set(7,4,z+5);
+    scene.add(p2);
+    if (z % 45 === 0){
+      const t = new THREE.Mesh(treeGeo, treeMat);
+      t.position.set(-12,2,z+3);
+      scene.add(t);
+      const t2 = new THREE.Mesh(treeGeo, treeMat);
+      t2.position.set(12,2,z-3);
+      scene.add(t2);
+    }
   }
 }
 
-// UI
-startBtn.addEventListener('click', ()=>{ bus.position.set(0,0,0); bus.rotation.y=0; state.speed=0; state.steering=0; currentCheckpoint=0; routeActive=true; paused=false; passengers.forEach(p=>p.paid=false); money=0; rep=0; moneyEl.textContent='0'; repEl.textContent='0'; log('Route started — drive with W/A/S/D'); });
-pauseBtn.addEventListener('click', ()=>{ paused = !paused; pauseBtn.textContent = paused ? 'Continue' : 'Pause'; log(paused ? 'Route paused' : 'Route continued'); });
+function startRoute(){
+  running = true;
+  $id('route-status').textContent = 'Status: En Route';
+}
 
-// tips bilingual
-const tips = [ '💡 Tip: Press C to change view', '💡 Press C ndo ubadilishe view gathee', '💡 Tip: Press W to move forward, A/D to steer', '💡 Press W ku-move mbele A/D ku-turn', '💡 Tip: The conductor handles fares', '💡 Makanga anaokota fare.' ];
-let tipIndex=0; function rotateTips(){ tipsEl.textContent = tips[tipIndex]; tipIndex=(tipIndex+1)%tips.length; } setInterval(rotateTips,6000); rotateTips();
+function pauseRoute(){
+  running = false;
+  $id('route-status').textContent = 'Status: Paused';
+}
 
-// splash fade and glare (play once)
-setTimeout(()=>{ if(splash){ splash.style.opacity='0'; setTimeout(()=>{ splash.style.display='none'; },1000); } },2200);
+function updateHUD(){
+  $id('money-amt').textContent = money;
+  $id('rep-amt').textContent = rep;
+  $id('stage-name').textContent = 'Stage: ' + (currentStageIdx+1) + (returning ? ' (Return)' : '');
+}
 
-// day / sunset control (both supported; default dynamic based on bus z)
-const dayMode = { hemiColor:0xffffff, sunColor:0xfff1d6, hemiIntensity:0.9, sunIntensity:1.0 };
-const sunsetMode = { hemiColor:0xffe9d6, sunColor:0xffb13b, hemiIntensity:0.4, sunIntensity:0.6 };
+function animate(){
+  const now = performance.now();
+  const dt = Math.min(0.05, (now - lastTime)/1000);
+  lastTime = now;
 
-// main loop
-const clock = new THREE.Clock();
-function animate(){ const dt = clock.getDelta(); if(routeActive && !paused) updateDriving(dt); else state.speed *= Math.pow(0.85, dt*60); checkStops(); passengers.forEach((p,i)=>{ p.mesh.rotation.y = Math.sin(performance.now()*0.001 + i)*0.05; }); const dayFactor = Math.max(0, Math.min(1, 1 - (Math.abs(bus.position.z) / 900))); // 1 near start (day), 0 far (sunset)
-const hemiColor = new THREE.Color(dayMode.hemiColor).lerp(new THREE.Color(sunsetMode.hemiColor), 1-dayFactor); hemi.color = hemiColor; hemi.intensity = dayMode.hemiIntensity * dayFactor + sunsetMode.hemiIntensity*(1-dayFactor); sun.color = new THREE.Color(dayMode.sunColor).lerp(new THREE.Color(sunsetMode.sunColor), 1-dayFactor); sun.intensity = dayMode.sunIntensity*dayFactor + sunsetMode.sunIntensity*(1-dayFactor); updateCamera(dt); renderer.render(scene,camera); requestAnimationFrame(animate); }
-window.addEventListener('resize', ()=>{ renderer.setSize(window.innerWidth, window.innerHeight-172); camera.aspect = canvas.clientWidth / canvas.clientHeight; camera.updateProjectionMatrix(); });
-renderer.setSize(window.innerWidth, window.innerHeight-172);
-animate();
+  if (running){
+    const target = routeStages[currentStageIdx];
+    if (target){
+      const dir = new THREE.Vector3().subVectors(target, bus.position);
+      const dist = dir.length();
+      if (dist < 2.5){
+        money += 50;
+        rep += 1;
+        if (!returning){
+          currentStageIdx++;
+          if (currentStageIdx >= routeStages.length){
+            currentStageIdx = routeStages.length - 2;
+            returning = true;
+            $id('route-status').textContent = 'Status: Arrived — Returning';
+            running = false;
+            setTimeout(()=>{ running=true; $id('route-status').textContent='Status: Return Trip'; }, 1400);
+          }
+        } else {
+          currentStageIdx--;
+          if (currentStageIdx < 0){
+            money += 100;
+            returning = false;
+            currentStageIdx = 1;
+            running = false;
+            $id('route-status').textContent = 'Status: Round Complete';
+            setTimeout(()=>{ running=true; $id('route-status').textContent='Status: En Route'; }, 1600);
+          }
+        }
+      } else {
+        dir.normalize();
+        bus.position.addScaledVector(dir, routeSpeed * dt);
+        const lookAtPos = new THREE.Vector3().copy(bus.position).add(dir);
+        bus.lookAt(lookAtPos);
+      }
+    }
+  }
 
+  if (chaseCam){
+    const ideal = new THREE.Vector3(bus.position.x, bus.position.y + 6, bus.position.z + 18);
+    chaseCam.position.lerp(ideal, 0.12);
+    chaseCam.lookAt(bus.position);
+    activeCam = chaseCam;
+  }
 
-// ✅ v0.6 Autopilot Integration
-import('./js/modules/autopilot.js').catch(()=>{});
+  updateHUD();
+  renderer.render(scene, activeCam);
+  requestAnimationFrame(animate);
+}
+
+function onResize(){
+  const w = window.innerWidth, h = window.innerHeight;
+  if (chaseCam){ chaseCam.aspect = w/h; chaseCam.updateProjectionMatrix(); }
+  if (cockpitCam){ cockpitCam.aspect = w/h; cockpitCam.updateProjectionMatrix(); }
+  renderer.setSize(w,h);
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  createScene();
+  $id('start-trip')?.addEventListener('click', startRoute);
+  $id('pause-trip')?.addEventListener('click', pauseRoute);
+  updateHUD();
+  lastTime = performance.now();
+  requestAnimationFrame(animate);
+});

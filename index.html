@@ -6,6 +6,23 @@
 <title>Nganya Rides v0.5 Stable Responsive</title>
 <link rel="stylesheet" href="style.css" />
 <script src="https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.min.js"></script>
+
+<style id="nganya-hud-style">
+  #hud, #gameHUD {
+    z-index: 9999 !important;
+    position: fixed;
+    top: 8px;
+    left: 12px;
+    color: #fff;
+    font-family: Arial, sans-serif;
+    pointer-events: auto;
+    background: rgba(0,0,0,0.0);
+  }
+  #hud div, #gameHUD div { margin: 6px 0; padding: 4px 8px; background: rgba(0,0,0,0.35); border-radius:6px; display:inline-block; }
+  #bottom-hud { position: fixed; left: 0; right:0; bottom: 8px; display:flex; justify-content:center; gap:12px; z-index:9999; }
+  #game-container { position: fixed; inset: 0; z-index: 0; }
+</style>
+
 </head>
 <body>
   <div id="splash" class="splash">
@@ -37,11 +54,18 @@
 
 <script type="module" src="main.js"></script>
 
-        <!-- ✅ Game HUD Overlay -->
-        <div id="gameHUD">
-          <div id="stageDisplay">Stage: 1</div>
-          <div id="fareNotice">Collecting Fares...</div>
-        </div>
-        
+<div id="game-container"></div>
+<div id="hud">
+  <div>Role: Driver <span id="role-info"></span></div>
+  <div>Money: KES <span id="money-amt">0</span></div>
+  <div>Rep: <span id="rep-amt">0</span></div>
+  <div id="stage-name">Stage: -</div>
+</div>
+<div id="bottom-hud">
+  <button id="start-trip">Start Route</button>
+  <button id="pause-trip">Pause</button>
+  <div id="route-status">Status: Idle</div>
+</div>
+
 </body>
 </html>

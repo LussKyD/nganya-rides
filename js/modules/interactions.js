@@ -30,9 +30,3 @@ export class ConductorAutopilot {
     }
   }
 }
-
-
-// ✅ Added fallback ConductorAutopilot
-export function ConductorAutopilot() {
-  console.log('Autopilot engaged for conductor');
-}
