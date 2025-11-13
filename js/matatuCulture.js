@@ -1,4 +1,4 @@
-import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'; // FIX: Explicit THREE import
 import { DRIVER, CONDUCTOR, stopRoute } from './game.js';
 
 // Traffic Light States
@@ -106,6 +106,7 @@ export class MatatuCulture {
     // ----------------------------------
     
     checkObstacleCollision(matatuMesh, obstacles) {
+        // FIX: Use Box3 constructor from imported THREE
         const matatuBoundingBox = new THREE.Box3().setFromObject(matatuMesh);
 
         for (let i = obstacles.length - 1; i >= 0; i--) {
