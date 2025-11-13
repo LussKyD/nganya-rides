@@ -1,4 +1,4 @@
-import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+// import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'; // REMOVED
 import { DRIVER, CONDUCTOR, stopRoute } from './game.js';
 
 const AUTOPILOT_FARE_RATE = 5; 
@@ -39,7 +39,7 @@ export class ConductorRole {
             this.scene.remove(this.targetMarkerMesh);
         }
         
-        const geometry = new THREE.TorusGeometry(3, 0.5, 16, 100);
+        const geometry = new THREE.TorusGeometry(3, 0.5, 16, 100); // THREE is now globally available
         const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.6 });
         this.targetMarkerMesh = new THREE.Mesh(geometry, material);
         
