@@ -1,4 +1,4 @@
-import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'; // FIX: Explicit THREE import
+import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
 import { DRIVER, CONDUCTOR, stopRoute } from './game.js';
 
 const AUTOPILOT_FARE_RATE = 5; 
