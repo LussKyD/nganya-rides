@@ -49,7 +49,7 @@ export const touchControl = { forward: false, left: false, right: false };
 let uiManager;
 let physics;
 let matatuCulture;
-let conductorRole; // Will be initialized in initScene
+let conductorRole; 
 
 // --- OBSTACLES AND ENVIRONMENT ---
 export const obstacles = [];
@@ -156,42 +156,45 @@ function createObstacles(count) {
     }
 }
 
+// FIX: Initialize Three.js objects first.
 export function initScene() {
-    // Dynamically import ConductorRole here to ensure all dependencies are loaded
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb); 
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.getElementById('canvasContainer').appendChild(renderer.domElement);
+    renderer.domElement.id = 'gameCanvas'; 
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6)); 
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); 
+    directionalLight.position.set(50, 100, 50);
+    scene.add(directionalLight);
+
+    createEnvironment();
+    matatuMesh = createMatatuPlaceholder();
+    matatuMesh.position.y = GROUND_LEVEL + (MATATU_HEIGHT / 2); 
+    scene.add(matatuMesh);
+    
+    createObstacles(OBSTACLE_COUNT);
+
+    window.addEventListener('resize', onWindowResize);
+    
+    // Call the module initialization helper function
+    initModules();
+}
+
+// NEW: Helper function to initialize modules after Three.js scene is created
+function initModules() {
+    // Dynamically import ConductorRole here to break the final dependency cycle
     import('./conductorRole.js').then(({ ConductorRole }) => {
-        
-        // Scene Setup
-        scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb); 
-        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-
-        // Renderer Setup
-        renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.getElementById('canvasContainer').appendChild(renderer.domElement);
-        renderer.domElement.id = 'gameCanvas'; 
-
-        // Lighting
-        scene.add(new THREE.AmbientLight(0xffffff, 0.6)); 
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); 
-        directionalLight.position.set(50, 100, 50);
-        scene.add(directionalLight);
-
-        // Environment & Matatu
-        createEnvironment();
-        matatuMesh = createMatatuPlaceholder();
-        matatuMesh.position.y = GROUND_LEVEL + (MATATU_HEIGHT / 2); 
-        scene.add(matatuMesh);
-        
-        createObstacles(OBSTACLE_COUNT);
-
-        window.addEventListener('resize', onWindowResize);
         
         // Initialize Modules
         uiManager = new UIManager(gameState, touchControl); 
         physics = new Physics(gameState, matatuMesh, keyState, touchControl);
         matatuCulture = new MatatuCulture(gameState, matatuMesh, uiManager);
-        conductorRole = new ConductorRole(gameState, matatuMesh, scene, uiManager); // Now conductorRole is defined
+        conductorRole = new ConductorRole(gameState, matatuMesh, scene, uiManager);
         
         // Link UIManager actions to core logic
         uiManager.linkActions({
@@ -202,16 +205,17 @@ export function initScene() {
             stopRoute: stopRoute,
         });
         
-        // CRITICAL FIX: Setup UI listeners ONLY AFTER actions are linked
+        // Setup UI listeners ONLY AFTER actions are linked
         uiManager.setupUI(); 
         
         matatuCulture.startTrafficLightCycle();
 
-        // Start the animation loop once everything is initialized
+        // Start the animation loop
         animate(); 
-        uiManager.showGameMessage("V10: Final Dependency Fixes Applied. The game should now be fully stable and playable.", 7000);
+        uiManager.showGameMessage("V11: Final Fixes Applied. The Matatu is ready to hit the road!", 7000);
     });
 }
+
 
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -224,7 +228,6 @@ function onWindowResize() {
 // ----------------------------------
 
 export function startRoute() {
-    // FIX: Check if conductorRole is defined before calling initRoute (it should be after the dynamic import fix)
     if (!conductorRole) {
         console.error("ConductorRole not initialized yet.");
         return;
@@ -236,7 +239,7 @@ export function startRoute() {
     }
     if (gameState.autopilotInterval !== null) return; 
 
-    conductorRole.initRoute(); // Ensure destination is set
+    conductorRole.initRoute(); 
     gameState.autopilotInterval = setInterval(gameLoop, 500); 
     gameState.isDriving = true;
     uiManager.showGameMessage("Route started!", 2000);
