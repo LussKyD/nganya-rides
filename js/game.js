@@ -1,4 +1,4 @@
-import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+// REMOVED: import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
 import { UIManager } from './uiManager.js';
 import { Physics } from './physics.js';
 import { MatatuCulture } from './matatuCulture.js';
@@ -158,6 +158,7 @@ function createObstacles(count) {
 
 // FIX: Initialize Three.js objects first.
 export function initScene() {
+    // FIX: The global THREE is now guaranteed to be available here due to index.html loading
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87ceeb); 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -212,7 +213,7 @@ function initModules() {
 
         // Start the animation loop
         animate(); 
-        uiManager.showGameMessage("V11: Final Fixes Applied. The Matatu is ready to hit the road!", 7000);
+        uiManager.showGameMessage("V12: Three.js global availability guaranteed. Drive the Matatu!", 7000);
     });
 }
 
