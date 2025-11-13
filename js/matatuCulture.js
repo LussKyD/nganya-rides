@@ -1,142 +1,111 @@
-import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'; // FIX: Explicit THREE import
-import { DRIVER, CONDUCTOR, stopRoute } from './game.js';
+// import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'; // REMOVED
+import { DRIVER } from './game.js';
 
-// Traffic Light States
-const LIGHT_RED = 'RED';
-const LIGHT_YELLOW = 'YELLOW';
-const LIGHT_GREEN = 'GREEN';
-const TRAFFIC_LIGHT_CYCLE = [
-    { color: LIGHT_GREEN, duration: 8000, hex: '#10b981' }, 
-    { color: LIGHT_YELLOW, duration: 2000, hex: '#fcd34d' }, 
-    { color: LIGHT_RED, duration: 5000, hex: '#ef4444' }     
-];
+const TRAFFIC_LIGHT_CYCLE = 10000; // 10 seconds per cycle segment (Green, Yellow, Red)
+const VIOLATION_CHANCE = 0.4; 
+const BASE_FINE = 200;
 
 export class MatatuCulture {
     constructor(gameState, matatuMesh, uiManager) {
         this.gameState = gameState;
         this.matatuMesh = matatuMesh;
         this.uiManager = uiManager;
-        
-        this.trafficLightDisplay = document.getElementById('trafficLightDisplay');
     }
-
-    // ----------------------------------
-    // --- TRAFFIC LIGHT SYSTEM ---
-    // ----------------------------------
 
     startTrafficLightCycle() {
-        if (this.gameState.lightTimerId) return;
-
-        let cycleIndex = 0;
-        
-        const transitionLight = () => {
-            const currentLight = TRAFFIC_LIGHT_CYCLE[cycleIndex];
+        // Initial state set in game.js: 'GREEN'
+        setInterval(() => {
+            if (this.gameState.isModalOpen) return;
             
-            this.gameState.trafficLightState = currentLight.color;
-            this.trafficLightDisplay.style.backgroundColor = currentLight.hex;
-
-            cycleIndex = (cycleIndex + 1) % TRAFFIC_LIGHT_CYCLE.length;
-            this.gameState.lightTimerId = setTimeout(transitionLight, currentLight.duration);
-        }
-
-        transitionLight();
+            let newState;
+            if (this.gameState.trafficLightState === 'GREEN') {
+                newState = 'YELLOW';
+            } else if (this.gameState.trafficLightState === 'YELLOW') {
+                newState = 'RED';
+            } else {
+                newState = 'GREEN';
+            }
+            
+            this.gameState.trafficLightState = newState;
+            this.uiManager.updateTrafficLight(newState);
+        }, TRAFFIC_LIGHT_CYCLE);
     }
-
+    
     checkTrafficViolation() {
-        if (this.gameState.role !== DRIVER || this.gameState.isModalOpen) return; 
+        if (this.gameState.role !== DRIVER || this.gameState.isModalOpen) return;
+        
+        // Check for running a red light (reckless driving)
+        if (this.gameState.trafficLightState === 'RED' && this.gameState.speed > 0.005) {
+            this.gameState.cash += 20; // Small reward for risk
 
-        // 1. Check for running a Red Light 
-        if (this.gameState.trafficLightState === LIGHT_RED && Math.abs(this.gameState.speed) > 0.005) {
-             if (Math.random() < 0.2) { 
-                stopRoute();
-                this.triggerPoliceInteraction("Running a RED light! The officer demands a 'chai' (tea).");
-                return;
-             }
-             this.uiManager.showGameMessage("You jumped the red light! (Reckless Driver Bonus + KSh 20)", 1500);
-             this.gameState.cash += 20; 
+            if (Math.random() < VIOLATION_CHANCE) {
+                this.triggerPoliceEncounter("Running a red light during rush hour.");
+            }
         }
         
-        // 2. Check for Reckless Speeding
-        if (this.gameState.speed > this.gameState.maxSpeed * 1.5) {
-             if (Math.random() < 0.05) { 
-                stopRoute();
-                this.triggerPoliceInteraction("Excessive Speeding! You need to 'sort out' the officer before they call the tow truck.");
-                return;
-             }
+        // We could add speeding checks here too
+    }
+    
+    checkObstacleCollision(matatuMesh, obstacles) {
+        if (this.gameState.isModalOpen) return;
+        
+        // Simple bounding box for the matatu (using global THREE now)
+        const matatuBox = new THREE.Box3().setFromObject(matatuMesh);
+
+        for (const obstacle of obstacles) {
+            const obstacleBox = new THREE.Box3().setFromObject(obstacle);
+            
+            if (matatuBox.intersectsBox(obstacleBox)) {
+                this.gameState.cash -= 50;
+                this.gameState.speed *= 0.1; // Massive speed penalty
+                this.uiManager.showGameMessage("Hit an obstacle (Cone)! KSh 50 penalty for property damage!", 2000);
+                
+                // Nudge the obstacle away after collision to prevent repeated triggers
+                obstacle.position.z += this.gameState.speed > 0 ? -1 : 1;
+                return; 
+            }
         }
     }
-
+    
     // ----------------------------------
-    // --- POLICE INTERACTION (BRIBERY) ---
+    // --- POLICE ENCOUNTER (BRIBERY/EXTORTION) ---
     // ----------------------------------
-
-    triggerPoliceInteraction(reason) {
+    
+    triggerPoliceEncounter(reason) {
         if (this.gameState.isModalOpen) return;
-
-        this.gameState.speed = 0;
+        
         this.gameState.isModalOpen = true;
         
-        const fine = Math.floor(Math.random() * 300) + 150; 
-        
-        this.uiManager.showPoliceModal(fine, reason, this.handlePoliceDecision.bind(this));
+        const fine = BASE_FINE + Math.floor(Math.random() * 200);
+        this.uiManager.openPoliceModal(reason, fine, this.handlePoliceDecision.bind(this));
     }
-
+    
     handlePoliceDecision(action, fine) {
+        this.gameState.isModalOpen = false;
+        
         if (action === 'pay') {
             if (this.gameState.cash >= fine) {
                 this.gameState.cash -= fine;
-                this.uiManager.showGameMessage(`Paid KSh ${fine}. "Fanya haraka." - Officer. Proceeding...`);
+                this.uiManager.showGameMessage(`Bribe paid (KSh ${fine}). Matatu is back on the road.`, 3000);
             } else {
-                this.uiManager.showGameMessage("Not enough cash! Officer is delayed while waiting for payment.", 5000);
+                // Not enough cash to bribe
+                this.uiManager.showGameMessage("Not enough cash! Detention risk increases...", 3000);
+                this.handleDeny(fine); 
             }
         } else if (action === 'deny') {
-            if (Math.random() < 0.3) { 
-                this.uiManager.showGameMessage("You successfully argued your case! The officer lets you go.", 3000);
-            } else {
-                this.uiManager.showGameMessage("Detained! The officer issues a severe warning and takes KSh 1000 from the day's earnings.", 5000);
-                this.gameState.cash = Math.max(0, this.gameState.cash - 1000);
-            }
+            this.handleDeny(fine);
         }
-        this.gameState.isModalOpen = false;
-        this.uiManager.updateUI(); 
+        this.uiManager.updateUI();
     }
     
-    // ----------------------------------
-    // --- COLLISION HANDLING ---
-    // ----------------------------------
-    
-    checkObstacleCollision(matatuMesh, obstacles) {
-        // FIX: Use Box3 constructor from imported THREE
-        const matatuBoundingBox = new THREE.Box3().setFromObject(matatuMesh);
-
-        for (let i = obstacles.length - 1; i >= 0; i--) {
-            const obstacle = obstacles[i];
-            
-            if (!obstacle) continue;
-
-            // Simple distance check first for performance
-            if (matatuMesh.position.distanceTo(obstacle.position) > 4) {
-                continue;
-            }
-
-            const obstacleBoundingBox = new THREE.Box3().setFromObject(obstacle);
-
-            if (matatuBoundingBox.intersectsBox(obstacleBoundingBox)) {
-                
-                this.gameState.speed *= 0.5; 
-                this.gameState.cash = Math.max(0, this.gameState.cash - 50);
-                
-                this.uiManager.showGameMessage("BUMP! You hit a traffic cone. KSh 50 deducted for minor damage.", 2000);
-
-                // Simple 'bounce back' effect
-                const angle = matatuMesh.rotation.y;
-                matatuMesh.position.x += 1 * Math.sin(angle);
-                matatuMesh.position.z -= 1 * Math.cos(angle);
-                
-                // Remove the cone 
-                matatuMesh.parent.remove(obstacle); // Use parent to remove from scene
-                obstacles.splice(i, 1); 
-            }
+    handleDeny(fine) {
+        // 50% chance of getting away, 50% chance of detention
+        if (Math.random() < 0.5) {
+            this.uiManager.showGameMessage("You talked your way out! Drive safe.", 3000);
+        } else {
+            const detentionPenalty = fine * 2;
+            this.gameState.cash -= detentionPenalty;
+            this.uiManager.showGameMessage(`Detained! Paid KSh ${detentionPenalty} official fine. Lose time & money.`, 5000);
         }
     }
 }
