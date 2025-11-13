@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nairobi Matatu 3D Simulator</title>
+    <!-- Load Three.js 3D library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Load Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Custom Styles -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- Three.js Render Target (Canvas is created and attached here) -->
+    <div id="canvasContainer"></div>
+
+    <!-- UI Overlay for HUD and Controls -->
+    <div class="ui-container">
+
+        <!-- Top Dashboard (HUD) -->
+        <div class="dashboard-card p-4 rounded-b-xl shadow-lg w-full max-w-sm mx-auto flex justify-between items-center">
+            <div class="text-xs sm:text-sm">
+                <p class="font-bold text-gray-700">Role: <span id="roleDisplay" class="text-red-600">Driver</span></p>
+                <p class="text-gray-600">Speed: <span id="speedDisplay">0 km/h</span></p>
+            </div>
+            <div class="text-xs sm:text-sm text-right">
+                <p class="font-bold text-indigo-700">Cash: <span id="cashDisplay">KSh 0</span></p>
+                <p class="text-gray-600">Fuel: <span id="fuelDisplay">100%</span></p>
+            </div>
+        </div>
+        
+        <!-- Utility Buttons (Right Side) -->
+        <div class="absolute top-2 right-2 sm:top-4 sm:right-4 flex flex-col gap-2">
+            <button id="switchRoleButton" class="dashboard-card p-2 text-xs rounded-full shadow-md pointer-events-auto hover:bg-gray-100">
+                Switch Role
+            </button>
+            <button id="refuelButton" class="dashboard-card p-2 text-xs rounded-full shadow-md pointer-events-auto bg-blue-500 text-white hover:bg-blue-600">
+                Refuel (KSh 500)
+            </button>
+        </div>
+        
+        <!-- Traffic Light Indicator (Left Side) -->
+        <div class="absolute top-4 left-4 flex items-center gap-2">
+            <div id="trafficLightDisplay" class="bg-green-500"></div>
+            <span class="dashboard-card p-2 rounded-lg text-xs font-semibold">Traffic Light</span>
+        </div>
+
+        <!-- Conductor Actions (Centered, top-middle-ish) -->
+        <div id="conductorControls" class="absolute top-1/4 left-1/2 transform -translate-x-1/2 flex flex-col gap-4" style="display: none;">
+             <div class="dashboard-card p-4 rounded-xl text-center shadow-lg text-gray-800 pointer-events-auto">
+                <p class="text-sm font-semibold">Driver Autopilot Active</p>
+                <p class="text-xs text-gray-500">Target: <span id="destinationDisplay"></span></p>
+                <p class="text-xs text-gray-500">Passengers: <span id="passengerCountDisplay">0</span>/14</p>
+            </div>
+            <button id="pickUpButton" class="control-button w-32 h-16 conductor-mode hidden">
+                Pick Up Passengers
+            </button>
+            <button id="dropOffButton" class="control-button w-32 h-16 conductor-mode hidden">
+                Drop Off Passengers
+            </button>
+        </div>
+
+
+        <!-- Driver Controls (Bottom Corners for Mobile) -->
+        <div id="driverControls" class="absolute bottom-4 left-4 flex flex-col gap-4">
+            <button id="turnLeftButton" class="control-button bg-gray-600 text-white">
+                Turn Left (A)
+            </button>
+        </div>
+        
+        <div id="driverControlsRight" class="absolute bottom-4 right-4 flex flex-col gap-4">
+            <button id="accelerateButton" class="control-button driving-mode mb-4">
+                Accelerate (W)
+            </button>
+            <button id="turnRightButton" class="control-button bg-gray-600 text-white">
+                Turn Right (D)
+            </button>
+        </div>
+
+    </div>
+    
+    <!-- Temporary Game Message Box -->
+    <div id="messageBox" class="fixed bottom-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 p-4 bg-yellow-600 text-white rounded-lg shadow-xl text-center transition-opacity duration-300 pointer-events-none opacity-0"></div>
+
+    <!-- Police Interaction Modal -->
+    <div id="policeModal" class="fixed inset-0 flex items-center justify-center hidden">
+        <div class="dashboard-card p-6 rounded-xl shadow-2xl max-w-sm w-11/12 text-center border-t-4 border-red-500">
+            <h2 class="text-xl font-bold text-red-700">Police Checkpoint!</h2>
+            <p id="policeReason" class="mt-2 text-sm text-gray-600">Violation details.</p>
+            
+            <p class="mt-4 text-lg font-semibold text-gray-800">Officer wants KSh <span id="fineAmount">200</span>.</p>
+
+            <div class="mt-6 flex flex-col gap-3">
+                <button id="payBribe" class="btn bg-green-500 text-white font-bold py-3 rounded-xl hover:bg-green-600">
+                    Pay 'Fine' (KSh 200)
+                </button>
+                <button id="denyBribe" class="btn bg-gray-500 text-white font-bold py-3 rounded-xl hover:bg-gray-600">
+                    Deny (Risk Detention)
+                </button>
+            </div>
+        </div>
+    </div>
+
+<!-- Load the core game module -->
+<script type="module" src="js/game.js"></script>
+
+</body>
+</html>
