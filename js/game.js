@@ -1,3 +1,4 @@
+import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
 import { UIManager } from './uiManager.js';
 import { Physics } from './physics.js';
 import { MatatuCulture } from './matatuCulture.js';
@@ -58,8 +59,7 @@ export const obstacles = [];
 // ----------------------------------
 
 function createMatatuPlaceholder() {
-    // 
-    const matatuGroup = new THREE.Group();
+    //     const matatuGroup = new THREE.Group();
     
     // 1. Main Body
     const bodyGeometry = new THREE.BoxGeometry(2.5, 1.5, 6);
@@ -185,7 +185,7 @@ export function initScene() {
     window.addEventListener('resize', onWindowResize);
     
     // Initialize Modules
-    uiManager = new UIManager();
+    uiManager = new UIManager(gameState, touchControl); // Pass state and touchControl
     physics = new Physics(gameState, matatuMesh, keyState, touchControl);
     matatuCulture = new MatatuCulture(gameState, matatuMesh, uiManager);
     conductorRole = new ConductorRole(gameState, matatuMesh, scene, uiManager);
@@ -198,6 +198,9 @@ export function initScene() {
         startRoute: startRoute,
         stopRoute: stopRoute,
     });
+    
+    // CRITICAL FIX: Setup UI listeners ONLY AFTER actions are linked
+    uiManager.setupUI(); 
     
     matatuCulture.startTrafficLightCycle();
 }
@@ -339,7 +342,18 @@ function animate() {
 // ----------------------------------
 
 window.onload = function() {
+    // Set up keyboard listeners globally
+    document.addEventListener('keydown', (e) => {
+        keyState[e.key] = true;
+        if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') {
+            startRoute();
+        }
+    });
+    document.addEventListener('keyup', (e) => {
+        keyState[e.key] = false;
+    });
+
     initScene();
     animate(); 
-    uiManager.showGameMessage("V7: Project Modularized! Driving is stable, traffic lights are active, and the Conductor has new destination tasks.", 7000);
+    uiManager.showGameMessage("V8: Critical Fixes Applied! Driving is stable, and all buttons should now function correctly.", 7000);
 };
