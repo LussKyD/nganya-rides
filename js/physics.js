@@ -1,7 +1,5 @@
-import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+// import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'; // REMOVED
 import { gameState, DRIVER, CONDUCTOR, matatuMesh, keyState, touchControl, GROUND_LEVEL, MATATU_HEIGHT, stopRoute } from './game.js';
-// Removed: import { ConductorRole } from './conductorRole.js'; 
-// Autopilot logic will be handled by passing control to game.js, which then calls conductorRole.
 
 const MIN_SPEED_THRESHOLD = 0.0001; 
 const BRAKE_FORCE = 0.005; 
@@ -9,7 +7,6 @@ const DRAG_FACTOR = 0.0005;
 const FUEL_CONSUMPTION_RATE = 0.05;
 
 export class Physics {
-    // Note: ConductorRole instance is no longer created here to avoid circular dependency
     constructor(gameState, matatuMesh, keyState, touchControl) {
         this.gameState = gameState;
         this.matatuMesh = matatuMesh;
@@ -21,11 +18,9 @@ export class Physics {
         this.gameState.fuel = Math.max(0, this.gameState.fuel - FUEL_CONSUMPTION_RATE); 
         if (this.gameState.fuel <= 0 && this.gameState.isDriving) {
             stopRoute();
-            // Game.js will handle showing the fuel empty message via the initialized UIManager
         }
     }
 
-    // driveUpdate now relies on the caller (game.js) to execute conductorRole.autopilotDrive
     driveUpdate(currentRole) {
         if (this.gameState.fuel <= 0 || this.gameState.isModalOpen) {
             this.gameState.speed = 0;
@@ -54,14 +49,11 @@ export class Physics {
         // --- 2. Handle Movement Logic ---
         if (currentRole === DRIVER) {
             this.handlePlayerInput(currentSpeedAbs);
-        } else if (currentRole === CONDUCTOR && this.gameState.autopilotInterval) {
-            // NOTE: The actual autopilot steering logic is now executed by game.js's animate() loop
-            // which calls conductorRole.autopilotDrive()
         }
         
         // --- 3. Apply Movement to Matatu Mesh ---
         if (Math.abs(this.gameState.speed) > MIN_SPEED_THRESHOLD) {
-            const direction = new THREE.Vector3(0, 0, 1);
+            const direction = new THREE.Vector3(0, 0, 1); // THREE is now globally available
             direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.matatuMesh.rotation.y);
             
             this.matatuMesh.position.x += direction.x * this.gameState.speed;
