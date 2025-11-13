@@ -1,6 +1,9 @@
 export class UIManager {
-    constructor() {
-        // --- DOM Elements ---
+    constructor(gameState, touchControl) {
+        this.gameState = gameState;
+        this.touchControl = touchControl;
+        
+        // --- DOM Elements (Cached) ---
         this.roleDisplay = document.getElementById('roleDisplay');
         this.cashDisplay = document.getElementById('cashDisplay');
         this.fuelDisplay = document.getElementById('fuelDisplay');
@@ -25,7 +28,6 @@ export class UIManager {
         this.passengerCountDisplay = document.getElementById('passengerCountDisplay');
         
         this.linkedActions = {};
-        this.setupEventListeners();
     }
     
     // Links core functions from game.js
@@ -33,7 +35,9 @@ export class UIManager {
         this.linkedActions = actions;
     }
 
-    setupEventListeners() {
+    // CRITICAL FIX: Set up listeners ONLY when called from game.js AFTER actions are linked
+    setupUI() {
+        // Core Actions
         this.switchRoleButton.addEventListener('click', () => this.linkedActions.switchRole());
         this.refuelButton.addEventListener('click', () => this.linkedActions.handleRefuel());
         
@@ -42,63 +46,68 @@ export class UIManager {
         this.dropOffButton.addEventListener('click', () => this.linkedActions.handleConductorAction('drop_off'));
         
         // Touch/Mouse Controls Setup
-        const setupButton = (element, key, isTurn = false) => {
-            const startFunc = () => { element.classList.add('opacity-100'); if (isTurn) { this.linkedActions.startRoute(); } };
-            const endFunc = () => { element.classList.remove('opacity-100'); };
+        const setupButton = (element, stateKey, startsRoute = false) => {
+            const startFunc = () => { 
+                element.classList.add('opacity-100'); 
+                this.touchControl[stateKey] = true;
+                if (startsRoute) this.linkedActions.startRoute(); 
+            };
+            const endFunc = () => { 
+                element.classList.remove('opacity-100'); 
+                this.touchControl[stateKey] = false;
+            };
             
-            element.addEventListener('touchstart', (e) => { e.preventDefault(); key.value = true; startFunc(); }, { passive: false });
-            element.addEventListener('touchend', (e) => { e.preventDefault(); key.value = false; endFunc(); });
-            element.addEventListener('mousedown', () => { key.value = true; startFunc(); });
-            element.addEventListener('mouseup', () => { key.value = false; endFunc(); });
-            element.addEventListener('mouseleave', () => { key.value = false; endFunc(); }); 
+            element.addEventListener('touchstart', (e) => { e.preventDefault(); startFunc(); }, { passive: false });
+            element.addEventListener('touchend', (e) => { e.preventDefault(); endFunc(); });
+            element.addEventListener('mousedown', startFunc);
+            element.addEventListener('mouseup', endFunc);
+            element.addEventListener('mouseleave', endFunc); 
         };
 
-        // Need to import touchControl object and modify its properties
-        import('./game.js').then(({ touchControl }) => {
-            setupButton(this.accelerateButton, { value: false, set value(v) { touchControl.forward = v; if(v) this.linkedActions.startRoute(); } });
-            setupButton(this.turnLeftButton, { value: false, set value(v) { touchControl.left = v; } }, true);
-            setupButton(this.turnRightButton, { value: false, set value(v) { touchControl.right = v; } }, true);
-        });
+        // Setup Player Driving Controls
+        setupButton(this.accelerateButton, 'forward', true);
+        setupButton(this.turnLeftButton, 'left');
+        setupButton(this.turnRightButton, 'right');
     }
 
     updateUI() {
-        import('./game.js').then(({ gameState, DRIVER }) => {
-            // Update HUD
-            this.roleDisplay.textContent = gameState.role;
-            this.roleDisplay.className = gameState.role === DRIVER ? 'text-red-600' : 'text-green-600';
-            this.cashDisplay.textContent = `KSh ${Math.round(gameState.cash)}`;
-            this.fuelDisplay.textContent = `${Math.round(gameState.fuel)}%`;
-            this.speedDisplay.textContent = `${(Math.abs(gameState.speed) * 1000).toFixed(1)} km/h`; 
-            
-            this.destinationDisplay.textContent = gameState.currentDestination ? gameState.currentDestination.name : 'N/A';
-            this.passengerCountDisplay.textContent = `${gameState.passengers}/${gameState.maxPassengers}`;
+        const { gameState, DRIVER } = this;
+        // Update HUD
+        this.roleDisplay.textContent = gameState.role;
+        this.roleDisplay.className = gameState.role === DRIVER ? 'text-red-600' : 'text-green-600';
+        this.cashDisplay.textContent = `KSh ${Math.round(gameState.cash)}`;
+        this.fuelDisplay.textContent = `${Math.round(gameState.fuel)}%`;
+        // Convert speed magnitude to km/h for display
+        this.speedDisplay.textContent = `${(Math.abs(gameState.speed) * 1000).toFixed(1)} km/h`; 
+        
+        this.destinationDisplay.textContent = gameState.currentDestination ? gameState.currentDestination.name : 'N/A';
+        this.passengerCountDisplay.textContent = `${gameState.passengers}/${gameState.maxPassengers}`;
 
-            // Update control visibility
-            if (gameState.isModalOpen) {
+        // Update control visibility
+        if (gameState.isModalOpen) {
+            this.driverControls.style.display = 'none';
+            this.driverControlsRight.style.display = 'none';
+            this.conductorControls.style.display = 'none';
+            this.refuelButton.style.display = 'none';
+        } else {
+            // Role-based controls
+            if (gameState.role === DRIVER) {
+                this.driverControls.style.display = 'flex';
+                this.driverControlsRight.style.display = 'flex';
+                this.conductorControls.style.display = 'none';
+            } else {
                 this.driverControls.style.display = 'none';
                 this.driverControlsRight.style.display = 'none';
-                this.conductorControls.style.display = 'none';
-                this.refuelButton.style.display = 'none';
-            } else {
-                // Role-based controls
-                if (gameState.role === DRIVER) {
-                    this.driverControls.style.display = 'flex';
-                    this.driverControlsRight.style.display = 'flex';
-                    this.conductorControls.style.display = 'none';
-                } else {
-                    this.driverControls.style.display = 'none';
-                    this.driverControlsRight.style.display = 'none';
-                    this.conductorControls.style.display = gameState.isDriving ? 'flex' : 'none'; 
-                }
-                this.refuelButton.style.display = gameState.fuel < 100 && gameState.role === DRIVER ? 'block' : 'none';
+                this.conductorControls.style.display = gameState.isDriving ? 'flex' : 'none'; 
             }
-            
-            // Update traffic light color (Relies on MatatuCulture module setting gameState.trafficLightState)
-            if (gameState.trafficLightState) {
-                const colors = { 'RED': '#ef4444', 'YELLOW': '#fcd34d', 'GREEN': '#10b981' };
-                document.getElementById('trafficLightDisplay').style.backgroundColor = colors[gameState.trafficLightState] || '#333';
-            }
-        });
+            this.refuelButton.style.display = gameState.fuel < 100 && gameState.role === DRIVER ? 'block' : 'none';
+        }
+        
+        // Update traffic light color
+        if (gameState.trafficLightState) {
+            const colors = { 'RED': '#ef4444', 'YELLOW': '#fcd34d', 'GREEN': '#10b981' };
+            document.getElementById('trafficLightDisplay').style.backgroundColor = colors[gameState.trafficLightState] || '#333';
+        }
     }
 
     updateConductorButtons(stopType) {
