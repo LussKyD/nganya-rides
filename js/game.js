@@ -1,4 +1,4 @@
-import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'; // FIX: Explicitly import THREE
+import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
 import { UIManager } from './uiManager.js';
 import { Physics } from './physics.js';
 import { MatatuCulture } from './matatuCulture.js';
@@ -209,7 +209,7 @@ export function initScene() {
 
         // Start the animation loop once everything is initialized
         animate(); 
-        uiManager.showGameMessage("V9: Dependency issues resolved. Game should now be fully playable.", 7000);
+        uiManager.showGameMessage("V10: Final Dependency Fixes Applied. The game should now be fully stable and playable.", 7000);
     });
 }
 
@@ -247,7 +247,6 @@ export function stopRoute() {
 
     clearInterval(gameState.autopilotInterval);
     gameState.autopilotInterval = null;
-    gameState.isDriving = false;
     gameState.speed = 0; 
     uiManager.showGameMessage("Route STOPPED.", 2000);
 }
@@ -338,6 +337,10 @@ function animate() {
         if (!gameState.isModalOpen) {
             physics.driveUpdate(gameState.role);
             matatuCulture.checkTrafficViolation();
+            // Conductor Autopilot needs to run in the high-frequency animation loop
+            if (gameState.role === CONDUCTOR && gameState.autopilotInterval) {
+                 conductorRole.autopilotDrive(gameState.speed);
+            }
             checkCollision();
         }
         
