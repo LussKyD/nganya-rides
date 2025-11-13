@@ -1,0 +1,80 @@
+
+/* ---------------------------------- */
+/* --- CSS STYLES (Mobile First) --- */
+/* ---------------------------------- */
+body {
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    overflow: hidden; /* Prevent scrolling caused by viewport changes */
+    touch-action: manipulation; /* Improves touch responsiveness */
+}
+#gameCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+.ui-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none;
+}
+.control-button {
+    pointer-events: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 80px;
+    height: 80px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    border-radius: 50%;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    opacity: 0.8;
+    transition: opacity 0.1s, transform 0.1s;
+}
+.control-button:active {
+    opacity: 1;
+    transform: scale(0.95);
+}
+/* Mobile-specific layout adjustments */
+@media (max-width: 640px) {
+    .control-button {
+        width: 70px;
+        height: 70px;
+    }
+}
+.driving-mode {
+    background-color: #ef4444; /* Red */
+    color: white;
+}
+.conductor-mode {
+    background-color: #10b981; /* Green */
+    color: white;
+}
+.dashboard-card {
+    pointer-events: auto;
+    backdrop-filter: blur(10px);
+    background-color: rgba(255, 255, 255, 0.8);
+}
+
+/* Traffic Light Styles */
+#trafficLightDisplay {
+    pointer-events: auto;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 3px solid #333;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    transition: background-color 0.5s;
+}
+/* Police Interaction Modal */
+#policeModal {
+    pointer-events: auto;
+    z-index: 20;
+    background-color: rgba(0, 0, 0, 0.7);
+}
